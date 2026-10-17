@@ -1,0 +1,31 @@
+{
+  "name": "canopy-ecommerce-serverless",
+  "version": "1.0.0",
+  "description": "Canopy Serverless Shopping Experience on AWS (Learner Lab Compatible)",
+  "private": true,
+  "scripts": {
+    "build:frontend": "npm run build --prefix frontend",
+    "build:backend": "npm run build --prefix backend",
+    "build:infrastructure": "npm run build --prefix infrastructure",
+    "build": "npm run build:frontend && npm run build:backend && npm run build:infrastructure",
+    "test:backend": "npm test --prefix backend",
+    "test:infrastructure": "npm test --prefix infrastructure",
+    "test": "npm run test:backend && npm run test:infrastructure",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "deploy:lab": "npm run deploy:lab --prefix infrastructure",
+    "synth": "npm run synth --prefix infrastructure"
+  },
+  "keywords": [
+    "aws",
+    "serverless",
+    "dynamodb",
+    "cognito",
+    "cdk",
+    "react",
+    "vite",
+    "tailwind"
+  ],
+  "author": "Nikhil Kumar",
+  "license": "MIT"
+}

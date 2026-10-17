@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest-primary: #173D30;
+  --color-forest-hover: #112d23;
+  --color-forest-light: #235544;
+  --color-ivory-bg: #F7F4ED;
+  --color-tangerine-cta: #F27A36;
+  --color-tangerine-hover: #df6621;
+  --color-text-charcoal: #252A27;
+  --color-text-muted: #6F766F;
+  --color-surface-card: #FFFFFF;
+  --color-border-warm: #E5DED1;
+  --color-sage-surface: #E8EFE7;
+  --color-sage-hover: #dbe5da;
+  --color-sale-red: #B83D32;
+  --color-sale-red-hover: #a13227;
+  --color-success-green: #28734D;
+}
+
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bg-main: #F7F4ED;
+  --nav-primary: #173D30;
+  --cta-primary: #F27A36;
+  --text-main: #252A27;
+  --text-secondary: #6F766F;
+  --surface-card: #FFFFFF;
+  --border-warm: #E5DED1;
+  --surface-sage: #E8EFE7;
+  --badge-sale: #B83D32;
+  --state-success: #28734D;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #F7F4ED;
+  color: #252A27;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbars matching Forest aesthetic */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F7F4ED;
+}
+::-webkit-scrollbar-thumb {
+  background: #E5DED1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6F766F;
+}
+
+/* Base button animations */
+button, a {
+  transition: all 0.15s ease-in-out;
+}
