@@ -1,7 +1,7 @@
 import type { Product, Order, CustomerAddress, ShippingMethod } from '../types';
 import { mockProducts } from '../data/mockProducts';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api';
 
 const getAuthHeaders = (): Record<string, string> => {
   const savedUser = localStorage.getItem('canopy_user');
@@ -294,5 +294,101 @@ export const api = {
     } catch {
       return false;
     }
+  },
+
+  // 4. Customer Address API
+  async getUserAddresses(): Promise<CustomerAddress[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/user/addresses`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return data.addresses || [];
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
+  },
+
+  async saveAddress(address: CustomerAddress): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/user/addresses`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(address)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async deleteAddress(addressId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/user/addresses/${addressId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async setDefaultAddress(addressId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/user/addresses/${addressId}/default`, {
+        method: 'PATCH',
+        headers: getAuthHeaders()
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  // 5. Amazon S3 Object Storage API
+  async getPresignedUpload(fileName: string, fileType: string): Promise<{ uploadUrl: string; key: string; publicUrl: string } | null> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/uploads/presign`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ fileName, fileType })
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fallback
+    }
+    return null;
+  },
+
+  async uploadToS3(uploadUrl: string, file: File): Promise<boolean> {
+    try {
+      const res = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type
+        },
+        body: file
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async listS3Media(): Promise<string[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/uploads`, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return data.items || [];
+      }
+    } catch {
+      // Fallback
+    }
+    return [];
   }
 };

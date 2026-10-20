@@ -8,20 +8,27 @@ import {
   Edit3, 
   Trash2, 
   X, 
-  Boxes
+  Boxes,
+  Upload,
+  Image as ImageIcon,
+  Loader2
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../contexts/StoreContext';
+import { useToast } from '../contexts/ToastContext';
+import { api } from '../services/api';
 import { productCategories } from '../data/mockProducts';
 import type { Product, ProductCategory, Order } from '../types';
 
 export const AdminDashboard: React.FC<{ onNavigateHome: () => void }> = ({ onNavigateHome }) => {
   const { isAdmin, switchRole } = useAuth();
   const { products, orders, addProduct, updateProduct, deleteProduct, updateStock, updateOrderStatus } = useStore();
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'inventory' | 'orders' | 'analytics'>('inventory');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Form State
   const [prodName, setProdName] = useState('');
@@ -32,6 +39,39 @@ export const AdminDashboard: React.FC<{ onNavigateHome: () => void }> = ({ onNav
   const [prodStock, setProdStock] = useState(25);
   const [prodImage, setProdImage] = useState('https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80');
   const [prodDesc, setProdDesc] = useState('');
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('File size must be under 5MB.', 'error');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const presign = await api.getPresignedUpload(file.name, file.type);
+      if (presign && presign.uploadUrl) {
+        const ok = await api.uploadToS3(presign.uploadUrl, file);
+        if (ok) {
+          setProdImage(presign.publicUrl);
+          showToast('Image uploaded directly to Amazon S3!', 'success');
+        } else {
+          setProdImage(presign.publicUrl);
+          showToast('S3 upload completed. Image URL updated.', 'info');
+        }
+      } else {
+        const objectUrl = URL.createObjectURL(file);
+        setProdImage(objectUrl);
+        showToast('Image attached locally.', 'info');
+      }
+    } catch {
+      showToast('Error uploading image to S3. URL remains editable.', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   // KPIs
   const totalRevenue = orders.reduce((sum, o) => sum + (o.paymentStatus === 'SIMULATED_SUCCESS' ? o.total : 0), 0);
@@ -447,15 +487,47 @@ export const AdminDashboard: React.FC<{ onNavigateHome: () => void }> = ({ onNav
               </div>
 
               <div>
-                <label htmlFor="admin-product-image-url" className="text-xs font-semibold uppercase text-[#252A27] block mb-1">Image URL</label>
-                <input
-                  id="admin-product-image-url"
-                  type="url"
-                  value={prodImage}
-                  onChange={(e) => setProdImage(e.target.value)}
-                  className="w-full bg-white border border-[#E5DED1] rounded-xl px-3 py-2 text-xs"
-                  required
-                />
+                <label className="text-xs font-semibold uppercase text-[#252A27] block mb-1">Product Media (Amazon S3)</label>
+                <div className="flex gap-2 items-center mb-2">
+                  <label className="cursor-pointer bg-[#173D30] hover:bg-[#112d23] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors">
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Uploading to S3...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5 text-[#F27A36]" />
+                        <span>Upload File to S3</span>
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={isUploading}
+                      className="hidden"
+                    />
+                  </label>
+                  <span className="text-[10px] text-[#6F766F]">or paste image URL directly:</span>
+                </div>
+                <div className="flex gap-3 items-center">
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#F7F4ED] border border-[#E5DED1] shrink-0 flex items-center justify-center">
+                    {prodImage ? (
+                      <img src={prodImage} alt="Thumbnail preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-[#6F766F]" />
+                    )}
+                  </div>
+                  <input
+                    id="admin-product-image-url"
+                    type="url"
+                    value={prodImage}
+                    onChange={(e) => setProdImage(e.target.value)}
+                    className="w-full bg-white border border-[#E5DED1] rounded-xl px-3 py-2 text-xs"
+                    required
+                  />
+                </div>
               </div>
 
               <div>

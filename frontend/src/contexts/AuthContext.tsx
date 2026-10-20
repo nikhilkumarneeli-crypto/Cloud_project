@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, CustomerAddress } from '../types';
+import { cognitoAuth } from '../services/cognitoAuth';
+import { api } from '../services/api';
 
 interface AuthContextType {
   user: User | null;
@@ -9,13 +11,17 @@ interface AuthContextType {
   openAuthModal: (mode?: 'signin' | 'register') => void;
   closeAuthModal: () => void;
   authModalMode: 'signin' | 'register';
-  login: (email: string, role?: 'customer' | 'admin') => Promise<void>;
-  register: (name: string, email: string) => Promise<void>;
+  login: (email: string, password?: string, role?: 'customer' | 'admin') => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
+  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  confirmSignUp: (name: string, email: string, code: string, password?: string) => Promise<{ success: boolean; error?: string }>;
+  resendCode: (email: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   switchRole: (role: 'customer' | 'admin') => void;
-  saveAddress: (address: Omit<CustomerAddress, 'id'>) => void;
-  deleteAddress: (id: string) => void;
-  setDefaultAddress: (id: string) => void;
+  saveAddress: (address: Omit<CustomerAddress, 'id'> & { id?: string }) => Promise<void>;
+  deleteAddress: (id: string) => Promise<void>;
+  setDefaultAddress: (id: string) => Promise<void>;
 }
 
 const DEFAULT_ADDRESSES: CustomerAddress[] = [
@@ -57,7 +63,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
     }
-    // Default active demo customer session for seamless review
+    // Default demo customer session
     return {
       id: 'usr-customer-01',
       name: 'Alex Woods',
@@ -80,6 +86,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
+  // Load addresses on mount or when user changes
+  useEffect(() => {
+    if (user?.id) {
+      api.getUserAddresses().then((serverAddrs) => {
+        if (serverAddrs && serverAddrs.length > 0) {
+          setUser((prev) => (prev ? { ...prev, addresses: serverAddrs } : prev));
+        }
+      }).catch(() => {
+        // Fallback to local addresses
+      });
+    }
+  }, [user?.id]);
+
   const openAuthModal = (mode: 'signin' | 'register' = 'signin') => {
     setAuthModalMode(mode);
     setIsAuthModalOpen(true);
@@ -89,70 +108,114 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAuthModalOpen(false);
   };
 
-  const login = async (email: string, role: 'customer' | 'admin' = 'customer') => {
-    const isAdmin = role === 'admin' || email.includes('admin');
-    const newUser: User = {
-      id: isAdmin ? 'usr-admin-01' : 'usr-customer-01',
-      name: isAdmin ? 'Elena Vance (Administrator)' : (email.split('@')[0] || 'Customer'),
-      email,
-      role: isAdmin ? 'admin' : 'customer',
-      addresses: DEFAULT_ADDRESSES,
-      defaultAddressId: 'addr-1',
-      token: `cognito-jwt-${isAdmin ? 'admin' : 'customer'}-${Date.now()}`
+  const login = async (email: string, password?: string, role: 'customer' | 'admin' = 'customer') => {
+    const res = await cognitoAuth.signIn(email, password, role);
+    if (res.success && res.user) {
+      // Ensure user has addresses
+      const userWithAddrs: User = {
+        ...res.user,
+        addresses: res.user.addresses && res.user.addresses.length > 0 ? res.user.addresses : (user?.addresses || DEFAULT_ADDRESSES),
+        defaultAddressId: user?.defaultAddressId || 'addr-1'
+      };
+      setUser(userWithAddrs);
+      closeAuthModal();
+      return { success: true };
+    }
+    return { 
+      success: false, 
+      error: res.error || 'Authentication failed. Please verify credentials.',
+      requiresVerification: res.requiresVerification
     };
-    setUser(newUser);
-    closeAuthModal();
   };
 
-  const register = async (name: string, email: string) => {
-    const newUser: User = {
-      id: `usr-${Date.now().toString(36)}`,
-      name,
-      email,
-      role: 'customer',
-      addresses: [],
-      token: `cognito-jwt-customer-${Date.now()}`
-    };
-    setUser(newUser);
-    closeAuthModal();
+  const register = async (name: string, email: string, password?: string) => {
+    const res = await cognitoAuth.signUp(name, email, password);
+    if (res.success) {
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Registration failed.' };
+  };
+
+  const confirmSignUp = async (name: string, email: string, code: string, password?: string) => {
+    const res = await cognitoAuth.confirmSignUp(name, email, code, password);
+    if (res.success && res.user) {
+      setUser({
+        ...res.user,
+        addresses: DEFAULT_ADDRESSES,
+        defaultAddressId: 'addr-1'
+      });
+      closeAuthModal();
+      return { success: true };
+    }
+    return { success: false, error: res.error || 'Invalid confirmation code.' };
+  };
+
+  const resendCode = async (email: string) => {
+    return await cognitoAuth.resendConfirmationCode(email);
+  };
+
+  const forgotPassword = async (email: string) => {
+    return await cognitoAuth.forgotPassword(email);
+  };
+
+  const confirmForgotPassword = async (email: string, code: string, newPassword: string) => {
+    return await cognitoAuth.confirmForgotPassword(email, code, newPassword);
   };
 
   const logout = () => {
+    cognitoAuth.signOut();
     setUser(null);
   };
 
   const switchRole = (newRole: 'customer' | 'admin') => {
     if (!user) {
-      login(newRole === 'admin' ? 'admin@canopy.shop' : 'alex.woods@canopy.shop', newRole);
+      login(newRole === 'admin' ? 'admin@canopy.store' : 'alex.woods@canopy.shop', undefined, newRole);
       return;
     }
     setUser({
       ...user,
       role: newRole,
       name: newRole === 'admin' ? 'Elena Vance (Administrator)' : 'Alex Woods',
-      email: newRole === 'admin' ? 'admin@canopy.shop' : 'alex.woods@canopy.shop'
+      email: newRole === 'admin' ? 'admin@canopy.store' : 'alex.woods@canopy.shop'
     });
   };
 
-  const saveAddress = (addressData: Omit<CustomerAddress, 'id'>) => {
+  const saveAddress = async (addressData: Omit<CustomerAddress, 'id'> & { id?: string }) => {
     if (!user) return;
+    const addressId = addressData.id || `addr-${Date.now()}`;
     const newAddress: CustomerAddress = {
       ...addressData,
-      id: `addr-${Date.now()}`
+      id: addressId
     };
+
     let updatedAddresses = [...user.addresses];
+    const existingIndex = updatedAddresses.findIndex(a => a.id === addressId);
+
     if (newAddress.isDefault) {
       updatedAddresses = updatedAddresses.map(a => ({ ...a, isDefault: false }));
     }
-    updatedAddresses.push(newAddress);
+
+    if (existingIndex >= 0) {
+      updatedAddresses[existingIndex] = newAddress;
+    } else {
+      updatedAddresses.push(newAddress);
+    }
+
     setUser({
       ...user,
       addresses: updatedAddresses,
       defaultAddressId: newAddress.isDefault ? newAddress.id : user.defaultAddressId
     });
+
+    // Sync to backend DynamoDB API
+    try {
+      await api.saveAddress(newAddress);
+    } catch {
+      // Offline fallback maintained in user state
+    }
   };
 
-  const deleteAddress = (id: string) => {
+  const deleteAddress = async (id: string) => {
     if (!user) return;
     const updated = user.addresses.filter(a => a.id !== id);
     setUser({
@@ -160,9 +223,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addresses: updated,
       defaultAddressId: user.defaultAddressId === id ? updated[0]?.id : user.defaultAddressId
     });
+
+    try {
+      await api.deleteAddress(id);
+    } catch {
+      // Local fallback
+    }
   };
 
-  const setDefaultAddress = (id: string) => {
+  const setDefaultAddress = async (id: string) => {
     if (!user) return;
     const updated = user.addresses.map(a => ({
       ...a,
@@ -173,6 +242,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addresses: updated,
       defaultAddressId: id
     });
+
+    try {
+      await api.setDefaultAddress(id);
+    } catch {
+      // Local fallback
+    }
   };
 
   return (
@@ -187,6 +262,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         authModalMode,
         login,
         register,
+        confirmSignUp,
+        resendCode,
+        forgotPassword,
+        confirmForgotPassword,
         logout,
         switchRole,
         saveAddress,

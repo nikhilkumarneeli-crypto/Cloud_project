@@ -39,6 +39,7 @@ export interface CartRecord {
 }
 
 export interface CustomerAddress {
+  id?: string;
   fullName: string;
   phone: string;
   street: string;
@@ -47,6 +48,7 @@ export interface CustomerAddress {
   state: string;
   postalCode: string;
   country: string;
+  isDefault?: boolean;
 }
 
 export type ShippingMethod = 'standard' | 'express' | 'free';
@@ -83,6 +85,7 @@ export interface APIGatewayResponse {
 
 export interface AuthenticatedUser {
   userId: string;
+  id?: string;
   email: string;
   role: 'customer' | 'admin';
   isAdmin: boolean;

@@ -107,6 +107,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ];
   });
 
+  // Load live products from backend on mount
+  React.useEffect(() => {
+    let isMounted = true;
+    api.getProducts().then((liveProds) => {
+      if (isMounted && liveProds && liveProds.length > 0) {
+        setProducts(liveProds);
+        localStorage.setItem('canopy_products', JSON.stringify(liveProds));
+      }
+    }).catch(() => {
+      // Offline fallback already in state
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const updateFilter = <K extends keyof ProductFilters>(key: K, value: ProductFilters[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
@@ -123,12 +139,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return false;
       }
       if (filters.searchQuery.trim()) {
-        const query = filters.searchQuery.toLowerCase();
-        const matchName = p.name.toLowerCase().includes(query);
-        const matchDesc = p.description.toLowerCase().includes(query);
-        const matchBrand = p.brand.toLowerCase().includes(query);
-        const matchCat = p.category.toLowerCase().includes(query);
-        if (!matchName && !matchDesc && !matchBrand && !matchCat) return false;
+        const words = filters.searchQuery.toLowerCase().trim().split(/\s+/);
+        const matchesAll = words.every(
+          (w) =>
+            p.name.toLowerCase().includes(w) ||
+            p.description.toLowerCase().includes(w) ||
+            p.brand.toLowerCase().includes(w) ||
+            p.category.toLowerCase().includes(w) ||
+            (p.badge && p.badge.toLowerCase().includes(w))
+        );
+        if (!matchesAll) return false;
       }
       if (filters.brand && p.brand !== filters.brand) {
         return false;

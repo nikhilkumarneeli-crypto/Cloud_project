@@ -40,7 +40,39 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct }) => {
   const { products, filteredProducts, filters, updateFilter, resetFilters } = useStore();
 
   const brands = Array.from(new Set(products.map((p) => p.brand)));
-  const trendingDeals = products.filter((p) => p.discountPercentage >= 20).slice(0, 4);
+
+  // Verifiable Trending Deals: Valid discount percentage >= 15%, prioritized by bestseller & discount
+  const trendingDeals = React.useMemo(() => {
+    return products
+      .filter((p) => {
+        if (!p.isActive || !p.originalPrice || p.originalPrice <= p.currentPrice) return false;
+        const actualDiscount = Math.round(((p.originalPrice - p.currentPrice) / p.originalPrice) * 100);
+        return actualDiscount >= 15;
+      })
+      .sort((a, b) => {
+        const aScore = (a.isTrendingDeal ? 2 : 0) + (a.isBestseller ? 1 : 0);
+        const bScore = (b.isTrendingDeal ? 2 : 0) + (b.isBestseller ? 1 : 0);
+        if (bScore !== aScore) return bScore - aScore;
+        const aDiscount = Math.round(((a.originalPrice - a.currentPrice) / a.originalPrice) * 100);
+        const bDiscount = Math.round(((b.originalPrice - b.currentPrice) / b.originalPrice) * 100);
+        if (bDiscount !== aDiscount) return bDiscount - aDiscount;
+        return b.reviewCount - a.reviewCount;
+      })
+      .slice(0, 4);
+  }, [products]);
+
+  // Verifiable Top Rated: Highest ratings (>= 4.7), breaking ties with review count
+  const topRatedProducts = React.useMemo(() => {
+    return products
+      .filter((p) => p.isActive && typeof p.rating === 'number' && p.rating >= 4.7 && p.reviewCount > 0)
+      .sort((a, b) => {
+        if (b.rating !== a.rating) {
+          return b.rating - a.rating;
+        }
+        return b.reviewCount - a.reviewCount;
+      })
+      .slice(0, 4);
+  }, [products]);
 
   return (
     <div className="space-y-10 pb-16">
@@ -195,15 +227,63 @@ export const HomePage: React.FC<HomePageProps> = ({ onSelectProduct }) => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {trendingDeals.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onSelect={onSelectProduct}
-              />
-            ))}
+          {trendingDeals.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {trendingDeals.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={onSelectProduct}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-xs text-[#6F766F] bg-white/60 rounded-2xl border border-[#E5DED1]">
+              No promotional deals currently active. Check back soon for seasonal discounts.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 3.5. Top Rated Showcase */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#E5DED1] shadow-xs space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#28734D]">
+                <Star className="w-4 h-4 text-[#F27A36] fill-[#F27A36]" />
+                <span>Customer Verified Favorites</span>
+              </div>
+              <h3 className="text-2xl font-black text-[#173D30] mt-1">Top Rated Essentials</h3>
+            </div>
+            <button
+              onClick={() => {
+                updateFilter('sortBy', 'rating');
+                const el = document.getElementById('catalog-section');
+                el?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="text-xs font-bold text-[#173D30] hover:text-[#F27A36] flex items-center gap-1 transition-colors"
+            >
+              <span>View All Highly Rated</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
           </div>
+
+          {topRatedProducts.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {topRatedProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={onSelectProduct}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-xs text-[#6F766F] bg-[#F7F4ED] rounded-2xl border border-[#E5DED1]">
+              No products meet the 4.7+ star rating criteria at this time.
+            </div>
+          )}
         </div>
       </section>
 

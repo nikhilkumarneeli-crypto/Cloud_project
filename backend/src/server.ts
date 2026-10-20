@@ -5,6 +5,7 @@ import { handler as cartHandler } from './handlers/cartHandler';
 import { handler as checkoutHandler } from './handlers/checkoutHandler';
 import { handler as ordersHandler } from './handlers/ordersHandler';
 import { handler as adminHandler } from './handlers/adminHandler';
+import { handler as userHandler } from './handlers/userHandler';
 import { seedDatabase } from './seed';
 
 const app = express();
@@ -121,7 +122,38 @@ app.get('/api/orders', async (req, res) => {
   sendLambdaResponse(res, result);
 });
 
+// User Address Routes
+app.get('/api/user/addresses', async (req, res) => {
+  const result = await userHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
+app.post('/api/user/addresses', async (req, res) => {
+  const result = await userHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
+app.delete('/api/user/addresses/:addressId', async (req, res) => {
+  const result = await userHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
+app.patch('/api/user/addresses/:addressId/default', async (req, res) => {
+  const result = await userHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
 // Admin Routes
+app.post('/api/admin/uploads/presign', async (req, res) => {
+  const result = await adminHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
+app.get('/api/admin/uploads', async (req, res) => {
+  const result = await adminHandler(adaptToLambda(req));
+  sendLambdaResponse(res, result);
+});
+
 app.post('/api/admin/products', async (req, res) => {
   const result = await adminHandler(adaptToLambda(req));
   sendLambdaResponse(res, result);

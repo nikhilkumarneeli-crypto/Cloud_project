@@ -17,6 +17,22 @@ export const handler = async (event: any) => {
     const user = extractUserFromEvent(event);
     requireAdmin(user);
 
+    // S3 Object Storage Presigned Upload: POST /admin/uploads/presign
+    if (path.includes('/uploads/presign') && httpMethod === 'POST') {
+      const { fileName, fileType } = body;
+      if (!fileName || !fileType) {
+        return errorResponse('fileName and fileType are required', 400);
+      }
+      const presigned = await adminService.generatePresignedUpload(fileName, fileType);
+      return successResponse(presigned);
+    }
+
+    // S3 Object Listing: GET /admin/uploads
+    if (path.includes('/uploads') && httpMethod === 'GET') {
+      const items = await adminService.listMediaUploads();
+      return successResponse({ items, count: items.length });
+    }
+
     // PATCH /admin/inventory/{productId}
     if (path.includes('/inventory') && httpMethod === 'PATCH') {
       const productId = pathParameters.productId || body.productId;
